@@ -1,0 +1,469 @@
+---
+title: "Final Project Proposal by Obale and Pamela"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+# Proposal {.tabset}
+
+
+## Prep
+
+```{r}
+
+# load libraries
+
+library(tidyverse)
+library(openxlsx)
+library(dataReporter)
+library(ggplot2)
+library(patchwork)
+library(googlesheets4)
+
+# load data
+
+gs4_deauth()
+df <- read_sheet("https://docs.google.com/spreadsheets/d/1hJmd9kSLRlzEK97cWLCc15yR1k9fWRhLK5ljzqlmVvw/edit?usp=sharing")
+
+```
+
+## Data cleaning
+
+```{r}
+
+ # Replace "xml:space="preserve">" with an empty string "" in columns Q30_1 through Q30_6
+
+df[, c("Q30_1", "Q30_2", "Q30_3", "Q30_4", "Q30_5", "Q30_6")] <- lapply(
+  df[, c("Q30_1", "Q30_2", "Q30_3", "Q30_4", "Q30_5", "Q30_6")], 
+  function(x) gsub("xml:space=\"preserve\">", "", x)
+)
+
+# remove the numbers in parenthesis in front of each observation 
+
+df$Q30_1 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_1)
+df$Q30_2 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_2)
+df$Q30_3 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_3)
+df$Q30_4 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_4)
+df$Q30_5 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_5)
+df$Q30_6 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_6)
+df$PPGENDER <- gsub("\\(\\d+\\)\\s+", "", df$PPGENDER)
+df$PPHHHEAD <- gsub("\\(\\d+\\)\\s+", "", df$PPHHHEAD)
+df$PPMSACAT <- gsub("\\(\\d+\\)\\s+", "", df$PPMSACAT)
+df$PPREG4 <- gsub("\\(\\d+\\)\\s+", "", df$PPREG4)
+df$LGBT <- gsub("\\(\\d+\\)\\s+", "", df$LGBT)
+df$MARRIED <- gsub("\\(\\d+\\)\\s+", "", df$MARRIED)
+df$NUM_CHILD_HH <- gsub("\\(\\d+\\)\\s+", "", df$NUM_CHILD_HH)
+df$Q16 <- gsub("\\(\\d+\\)\\s+", "", df$Q16)
+df$PPETHM <- gsub("\\(\\d+\\)\\s+", "", df$PPETHM)
+df$PPEDUCAT <- gsub("\\(\\d+\\)\\s+", "", df$PPEDUCAT)
+
+# removing everything but the numbers in columns PPINCIMP and PPETHM
+
+#df$PPINCIMP <- gsub("\\((\\d+)\\).*", "\\1", df$PPINCIMP) # This leaves the numbers (codes)
+df$PPINCIMP <- gsub("^[^ ]*\\s", "", df$PPINCIMP) # This leaves the income categories
+#df$PPETHM <- gsub("[^0-9]+", "", df$PPETHM)
+#df$PPEDUCAT <- gsub("\\D*(\\d+)\\D*", "\\1", df$PPEDUCAT)
+
+
+# simplifying the responses of Q16 to only No and Yes
+
+df$Q16 <- gsub(".*(No|Yes).*", "\\1", df$Q16)
+
+# remove space at the end of "Most of the time" and "Some of the time"
+
+df$Q30_1 <- trimws(df$Q30_1)
+df$Q30_2 <- trimws(df$Q30_2)
+df$Q30_3 <- trimws(df$Q30_3)
+df$Q30_4 <- trimws(df$Q30_4)
+df$Q30_5 <- trimws(df$Q30_5)
+df$Q30_6 <- trimws(df$Q30_6)
+
+
+# changing the responses of the questionnaire to the respective numbers 
+
+
+df <- df %>%
+  mutate(Q30_1 = recode(Q30_1, "None of the time" = 0, "A little of the time" = 1, 
+                               "Some of the time" = 2, "Most of the time" = 3, 
+                               "All of the time" =4),
+         Q30_2 = recode(Q30_2, "None of the time" = 0, "A little of the time" = 1, 
+                               "Some of the time" = 2, "Most of the time" = 3, 
+                               "All of the time" =4),
+         Q30_3 = recode(Q30_3, "None of the time" = 0, "A little of the time" = 1, 
+                               "Some of the time" = 2, "Most of the time" = 3, 
+                               "All of the time" =4),
+        Q30_4 = recode(Q30_4, "None of the time" = 0, "A little of the time" = 1, 
+                               "Some of the time" = 2, "Most of the time" = 3, 
+                               "All of the time" =4),
+         Q30_5 = recode(Q30_5, "None of the time" = 0, "A little of the time" = 1, 
+                               "Some of the time" = 2, "Most of the time" = 3, 
+                               "All of the time" =4),
+         Q30_6 = recode(Q30_6, "None of the time" = 0, "A little of the time" = 1, 
+                               "Some of the time" = 2, "Most of the time" = 3, 
+                               "All of the time" =4))
+
+
+```
+
+
+## Variables as factors 
+
+```{r}
+
+df$PPETHM <- factor(df$PPETHM, 
+                                  levels = c("White, Non-Hispanic", "Black, Non-Hispanic", "Other, Non-Hispanic", "Hispanic", "2+ Races, Non-Hispanic"))
+
+
+df$PPEDUCAT <- factor(df$PPEDUCAT, 
+                                  levels = c("Less than high school", "High school", 
+                                             "Some college", "Bachelor's degree or higher"))
+
+```
+
+## Creating new outcome indicator
+
+```{r}
+
+# Adding up all the values for K-6 questions
+
+df$sum_Q30 <- rowSums(df[, c("Q30_1", "Q30_2", "Q30_3", "Q30_4", "Q30_5", "Q30_6")])
+
+# creating dummy variable determining if the observation experience psychological distress or not
+# 1 = score is 13 or higher (psychological distress), 0 = score is lower than 13 (no psychological distress)
+
+df$score_final <- ifelse(df$sum_Q30 >= 13, 1, 0)
+
+df$score_class <- ifelse(df$score_final == 0, "low to moderate distress","high risk of psychological distress") #Adding the new variable "score_class" which mentions the class of each participant. 
+                            
+
+
+```
+
+
+
+## Creating a codebook
+
+```{r}
+
+# Specify the variables to be included in the summary report
+#vars_to_include <- c("Q30_1", "Q30_2", "Q30_3", "Q30_4", "Q305", "Q30_6",
+#                     "PPAGE", "PPETHM", "PPEDUCAT", "PPGENDER",
+#         "PPHHHEAD", "PPINCIMP", "PPMSACAT", "PPREG4",
+#         "LGBT", "MARRIED", "NUM_CHILD_HH", "Q16")
+
+
+# Create the DataReporter object and generate the codebook
+
+#dataReporter::makeDataReport(df, 
+ #                                vars = vars_to_include,
+ #                                file = "proposal_codebook_Mar7.Rmd", 
+  #                           replace = TRUE)
+
+```
+
+
+## Data exploration
+
+```{r}
+# describing variables
+
+str(df)
+head(df)
+```
+
+
+Outcome variables
+
+```{r}
+
+
+# K-6 question bar plots
+
+p1 <- ggplot(data = df) +
+  geom_bar(aes(x= Q30_1)) +
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+p2 <- ggplot(data = df) +
+  geom_bar(aes(x= Q30_2)) +
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+p3 <- ggplot(data = df) +
+  geom_bar(aes(x= Q30_3)) +
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+p4 <- ggplot(data = df) +
+  geom_bar(aes(x= Q30_4)) +
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+p5 <- ggplot(data = df) +
+  geom_bar(aes(x= Q30_5)) +
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+p6 <- ggplot(data = df) +
+  geom_bar(aes(x= Q30_6)) +
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+(p1 + p2 + p3) / (p4 + p5 + p6)
+
+
+```
+
+How this can help us learn more about our data:
+
+Based on these visualizations, we can see that there is variability in the responses for each one of the K-6 questions. The K-6 scale is an indicator for psychological distress (our outcome variable and construct of interest). Our goal would be do determine who are the individuals that are showing the highest scores in the scale and what sociodemographic factors do they have in common? 
+
+Our next steps will include some data wrangling to tidy the answer responses (i.e. removing white space, changing the responses to the numerical scale according to the K-6 indicator scores, etc.). By having the correspong points associated with each one of the possible K-6 answers, the appropiate calculations can be made to determine if that particular individual can be considered to have physchological distress. (> 13 points )
+
+
+
+ Predictor variables 
+
+```{r}
+# age
+
+p7 <- ggplot(data = df) +
+  geom_bar(aes(x= PPAGE)) +
+  labs(x = "Age")
+
+
+```
+
+```{r}
+
+# Race/Ethnicity
+
+
+
+p8 <- ggplot(data = df) +
+  geom_bar(aes(x= PPETHM)) +
+  labs(x = "Race/Ethnicity")
+
+```
+
+```{r}
+# Education
+
+p9 <- ggplot(data = df) +
+  geom_bar(aes(x= PPEDUCAT)) +
+  labs(x = "Education")
+```
+
+
+```{r}
+
+# Gender
+
+p10 <- ggplot(data = df) +
+  geom_bar(aes(x= PPGENDER)) +
+  labs(x = "Gender")
+```
+
+```{r}
+
+# Income
+
+p11 <- ggplot(data = df) +
+  geom_bar(aes(x= PPINCIMP)) +
+  labs(x = "Income")
+
+```
+
+```{r}
+
+# Region
+
+p12 <- ggplot(data = df) +
+  geom_bar(aes(x= PPREG4)) +
+  labs(x = "Region")
+
+```
+
+
+```{r}
+# Number of children
+
+p13 <- ggplot(data = df) +
+  geom_bar(aes(x= NUM_CHILD_HH)) +
+  labs(x = "Number of children")
+```
+
+```{r}
+# overall predictor plot
+
+(p7 + p8 + p9) / (p10 + p11 + p12)
+
+```
+
+How this can help us learn more about our data:
+
+Having plots for the predictor/exposure variables allows us to assess the distribution patterns in the population. For age, we can see that the participants ranged from age 18 to 64. For race/ethnicity we can see that the majority of the participants belong to the whit/non-hispanic group. With our project, we plan to assess if being part of any minority group could be a predictor for psychological distress. With the education variable we can see that the majority of the participants had at least a high school degree.  We have about an even distribution in the gender variable. The distribution of the income variable shows that the income of the participants ranged from below $5000 to above $250000. There is representation from the four regions in the US. 
+
+Overall, we can see that our predictor variables have a fair representation in each of their categories/values. This will allow us to identify if there are any specific predictors playing a role in determining the risk for psychological distress in the year 2020. With these visualizations we can have a general idea of the composition of our study group and could also help us narrow down the predictors we could use for our model. 
+
+
+
+
+## Checking for confounding
+
+### Gender vs. Education
+```{r}
+chisq.test(table(df$PPGENDER, df$PPEDUCAT))
+chisq.test(table(df$score_class, df$PPGENDER))
+chisq.test(table(df$score_class, df$PPEDUCAT))
+```
+Gender is a confounding variable for education
+
+### Race/Ethnicity and Education
+```{r}
+chisq.test(table(df$PPETHM, df$PPEDUCAT))
+chisq.test(table(df$score_class, df$PPETHM))
+chisq.test(table(df$score_class, df$PPEDUCAT))
+```
+
+Race/Ethnicity does not significantly confound education
+
+
+### Gender and income
+```{r}
+chisq.test(table(df$PPGENDER, df$PPINCIMP))
+chisq.test(table(df$score_class, df$PPINCIMP))
+chisq.test(table(df$score_class, df$PPEDUCAT))
+```
+
+Gender is also statistically significantly associated with income
+
+### Income and education
+```{r}
+chisq.test(table(df$PPINCIMP, df$PPEDUCAT))
+chisq.test(table(df$score_class, df$PPINCIMP))
+chisq.test(table(df$score_class, df$PPEDUCAT))
+```
+
+### Race/Ethnicity and income
+```{r}
+chisq.test(table(df$PPETHM, df$PPINCIMP))
+chisq.test(table(df$score_class, df$PPETHM))
+chisq.test(table(df$score_class, df$PPINCIMP))
+```
+
+## Making visualizations for Psychological distress
+
+### By region
+
+```{r}
+df_region <- df %>% 
+  select(PPREG4, score_class) %>%
+  remove_missing() %>%
+  
+  group_by(PPREG4, score_class) %>%
+    summarise(total = length(score_class))
+
+df_region <- df_region %>%
+  group_by(PPREG4) %>%
+  mutate(sum = sum(total)) %>%
+  mutate(proption = (total/sum)*100)
+
+df_region %>%
+  filter(score_class == "high risk of psychological distress") %>%
+ggplot(aes(x = fct_reorder(PPREG4, proption), y = proption, fill = PPREG4)) +
+  geom_col() + 
+  theme(legend.position = "none") +
+  ylab("Percentage of individuals with \nhigh risk of ppsychological distress") +
+  xlab("Region") +
+  labs(title = "High Risk Psychological Distress Rates Across US Regions") 
+
+
+```
+
+### By income category
+
+```{r}
+df_income <- df %>% 
+  select(PPINCIMP, score_class) %>%
+  remove_missing() %>%
+  
+  group_by(PPINCIMP, score_class) %>%
+    summarise(total = length(score_class))
+
+df_income <- df_income %>%
+  group_by(PPINCIMP) %>%
+  mutate(sum = sum(total)) %>%
+  mutate(proption = (total/sum)*100)
+
+df_income %>%
+  filter(score_class == "high risk of psychological distress") %>%
+ggplot(aes(x = fct_reorder(PPINCIMP, -proption), y = proption, color = PPINCIMP)) +
+  geom_point(size = 3.5) + 
+  geom_segment(aes(x = PPINCIMP, xend = PPINCIMP, y = proption, yend = 0)) +
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=0.5)) +
+  theme(legend.position = "none") +
+  ylab("Percentage of individuals with \nhigh risk of ppsychological distress") +
+  xlab("Income category") +
+  labs(title = "High Risk Psychological Distress Rates in the US by Income Category") 
+```
+
+### Number of children in the household
+```{r}
+df_children <- df %>% 
+  select(NUM_CHILD_HH, score_class) %>%
+  remove_missing() %>%
+  
+  group_by(NUM_CHILD_HH, score_class) %>%
+    summarise(total = length(score_class))
+
+df_children <- df_children %>%
+  group_by(NUM_CHILD_HH) %>%
+  mutate(sum = sum(total)) %>%
+  mutate(proption = (total/sum)*100)
+
+df_children %>%
+  filter(score_class == "high risk of psychological distress") %>%
+ggplot(aes(x = fct_reorder(NUM_CHILD_HH, proption), y = proption, color = NUM_CHILD_HH)) +
+  geom_point(size = 3.5) + 
+  geom_segment(aes(x = NUM_CHILD_HH, xend = NUM_CHILD_HH, y = proption, yend = 0)) +
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  theme(legend.position = "none") +
+  ylab("Percentage of individuals with \nhigh risk of ppsychological distress") +
+  xlab("Number of children") +
+  labs(title = "High Risk Psychological Distress Rates in the US \nby Number of Children in the Household")
+```
+
+### Function that enables us to visualize any variable
+```{r}
+plot_df <- function(catg) {
+  
+  #catg <- get(catg)
+  catg <- sym(catg)
+  
+ df %>% 
+  select(!!catg, score_class) %>%
+  remove_missing() %>%
+ 
+  group_by(!!catg, score_class) %>%
+    summarise(total = length(score_class)) %>%
+
+  group_by(!!catg) %>%
+  mutate(sum = sum(total)) %>%
+  mutate(proption = (total/sum)*100) %>%
+
+  filter(score_class == "high risk of psychological distress") %>%
+ggplot(aes(x = fct_reorder(!!catg, proption), y = proption, color = !!catg)) +
+  geom_point(size = 3.5) + 
+  geom_segment(aes(x = !!catg, xend = !!catg, y = proption, yend = 0)) +
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=0.5)) +
+  theme(legend.position = "none") +
+  ylab("Percentage of individuals with \nhigh risk of psychological distress") +
+  xlab("Income category") +
+  labs(title = "High Risk Psychological Distress Rates in the US by Income Category")  
+}
+```
+
+
+```{r}
+plot_df("MARRIED")
+
+```
+
