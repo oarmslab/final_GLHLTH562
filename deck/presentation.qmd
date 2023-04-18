@@ -1,0 +1,161 @@
+---
+format:
+  revealjs:
+    theme: white
+output: 
+  quarto::quarto_presentation:
+    title-page: false
+    css: custom.css
+    slide-number: c/t
+    transition: slide
+    incremental: true
+    hide-address-bar: true
+---
+<section class="title-slide">
+  <h1>Psychological Distress in the United States in 2020</h1>
+  <h2>Obale and Pamela</h2>
+  <img src="./pyschological_distress.png" alt="Description of the image">
+</section>
+
+<style>
+.title-slide {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  height: 90%;
+}
+
+.title-slide img {
+  width: 30%;
+  max-width: 600px;
+}
+</style>
+
+
+
+```{r prep}
+
+#load libraries
+library(googlesheets4)
+
+# load data
+gs4_deauth()
+df <- read_sheet("https://docs.google.com/spreadsheets/d/1hJmd9kSLRlzEK97cWLCc15yR1k9fWRhLK5ljzqlmVvw/edit?usp=sharing")
+```
+
+## Research Question
+
+::: {style="text-align: center; display: flex; justify-content: center; align-items: center; height: 60vh;"}
+
+1. *What is the pattern of psychological distress among non-elderly adults in the United States in 2020?*
+
+2. *What factors are associated with **high risk** of physiological distress?*
+
+:::
+
+## Dataset
+
+::: {style="margin-top: 1em;"}
+[Well-Being and Basic Needs Survey (2020)](https://www.icpsr.umich.edu/web/HMCA/studies/38388)
+
+- Purpose: track the well-being of adults and their families across the country
+- 7,737 individuals between 18-64 years old 
+- Data consists of psychological distress measures using the K6+ scale and sociodemographic variables 
+
+:::
+
+## Project Design
+
+**Predictors**: 
+
+:::: {.columns}
+
+::: {.column width="50%"}
+  - gender
+  - age
+  - level of education
+  - race/ethnicity
+  - income level
+:::
+
+::: {.column width="50%"}
+ - head of household status
+ - number of children
+ - LGBT
+ - metropolitan area
+ - US region
+:::
+
+::::
+
+**Outcome**: Psychological distress level (K6+ scale)
+
+
+## Kessler Psychological Distress Scale
+
+- The sum of the sores lies between 0 and 24
+- 1-12 “low to moderate distress” & 13-24 “high risk of psychological distress”
+
+::: {style="text-align: center; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 60vh; margin-bottom: 0.01px;"}
+
+<img src="./k6scale.png" style="width: 75% !important; height: auto !important;">
+
+:::
+
+## Methods - Data wrangling
+
+```{r echo=TRUE}
+# replace "xml:space="preserve">" with an empty string "" in columns Q30_1 through Q30_6
+
+df[, c("Q30_1", "Q30_2", "Q30_3", "Q30_4", "Q30_5", "Q30_6")] <- lapply(
+  df[, c("Q30_1", "Q30_2", "Q30_3", "Q30_4", "Q30_5", "Q30_6")],
+  function(x) gsub("xml:space=\"preserve\">", "", x))
+
+# remove the numbers in parenthesis in front of each observation
+df$Q30_1 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_1)
+df$Q30_2 <- gsub("\\(\\d+\\)\\s+", "", df$Q30_2)
+df$PPGENDER <- gsub("\\(\\d+\\)\\s+", "", df$PPGENDER)
+df$PPHHHEAD <- gsub("\\(\\d+\\)\\s+", "", df$PPHHHEAD)
+df$PPMSACAT <- gsub("\\(\\d+\\)\\s+", "", df$PPMSACAT)
+df$PPEDUCAT <- gsub("\\(\\d+\\)\\s+", "", df$PPEDUCAT)
+
+# removing everything but the numbers in columns PPINCIMP 
+df$PPINCIMP <- gsub("^[^ ]*\\s", "", df$PPINCIMP) # This leaves the income categories
+
+```
+
+
+## Methods
+
+1. Determined the overall rate of high risk of psychological distress 
+2. Explored the distribution of psychological distress across levels of predictor variables
+3. Ran logistic regression models  
+4. Incorporated steps 1-3 into a shiny app
+
+
+## Results:
+
+::: {style="text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 80vh; margin-bottom: 20px;"}
+
+[Psyhcological Distress Dashboard](https://pespinoza8.shinyapps.io/Final_app/)
+
+![](./dashboard.png)
+
+:::
+
+
+
+## Conclusion
+
+- Rate of high risk of psychological distress is similar to what is reported in the literature
+- The odds of psychological distress were higher among female, unmarried, LGBT, and younger individuals, as well as individuals with a level of education below Bachelor’s degree
+- Applications for global health research
+
+
+
+
+
+
+
